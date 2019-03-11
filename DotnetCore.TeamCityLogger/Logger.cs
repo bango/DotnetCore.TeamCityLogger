@@ -1,8 +1,9 @@
-﻿using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace DotnetCore.TeamCityLogger
@@ -38,17 +39,17 @@ namespace DotnetCore.TeamCityLogger
             {
                 if (message.Category == TestResultMessage.StandardOutCategory)
                 {
-                    WriteServiceMessage($"testStdOut name='{testName}'] out='{message.Text}'");
+                    WriteServiceMessage($"testStdOut name='{testName}'] out='{Escape(message.Text)}'");
                 }
                 else if (message.Category == TestResultMessage.StandardErrorCategory)
                 {
-                    WriteServiceMessage($"testStdErr name='{testName}'] out='{message.Text}'");
+                    WriteServiceMessage($"testStdErr name='{testName}'] out='{Escape(message.Text)}'");
                 }
             }
 
             if (e.Result.Outcome == TestOutcome.Failed)
             {
-                WriteServiceMessage($"testFailed name='{testName}' message='{e.Result.ErrorMessage}' details='{e.Result.ErrorStackTrace}'");
+                WriteServiceMessage($"testFailed name='{testName}' message='{Escape(e.Result.ErrorMessage)}' details='{Escape(e.Result.ErrorStackTrace)}'");
             }
 
             WriteServiceMessage($"testFinished name='{testName}' duration='{e.Result.Duration.TotalMilliseconds}'");
@@ -76,6 +77,49 @@ namespace DotnetCore.TeamCityLogger
         private static void WriteServiceMessage(string message)
         {
             Console.WriteLine($"##teamcity[{message.Replace("\r\n","\\r\\n").Replace("\n","\\n")}]");
+        }
+        
+        static bool IsAscii(char ch) => ch <= '\x007f';
+        
+        static string Escape(string value)
+        {
+            var sb = new StringBuilder(value.Length);
+            for (int i = 0; i < value.Length; i++)
+            {
+                var ch = value[i];
+
+                switch (ch)
+                {
+                    case '|':
+                        sb.Append("||");
+                        break;
+                    case '\'':
+                        sb.Append("|'");
+                        break;
+                    case '\n':
+                        sb.Append("|n");
+                        break;
+                    case '\r':
+                        sb.Append("|r");
+                        break;
+                    case '[':
+                        sb.Append("|[");
+                        break;
+                    case ']':
+                        sb.Append("|]");
+                        break;
+                    default:
+                        if (IsAscii(ch))
+                            sb.Append(ch);
+                        else
+                        {
+                            sb.Append("|0x");
+                            sb.Append(((int)ch).ToString("x4"));
+                        }
+                        break;
+                }
+            }
+            return sb.ToString();
         }
     }
 }
